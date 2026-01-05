@@ -145,7 +145,7 @@ class SwrEe(QueryResourceManager):
         # 'body' is the field name in the response containing the instance list
         # 'offset' is the parameter name for pagination
         enum_spec = ('list_instance_repositories', 'body', 'offset')
-        id = 'uid'  # Specify resource unique identifier field name
+        id = 'id'  # Specify resource unique identifier field name
         name = 'name'  # Specify resource name field name
         filter_name = 'name'  # Field name for filtering by name
         filter_type = 'scalar'  # Filter type (scalar for simple value comparison)
@@ -206,7 +206,7 @@ class SwrEe(QueryResourceManager):
 
                 for repository in repositories:
                     repository['instance_id'] = instance['id']
-                    repository['uid'] = f"{instance['id']}/{repository['name']}"
+                    repository['id'] = f"{instance['id']}/{repository['name']}"
                     repository['is_public'] = namespaces_public_mapping.get(
                         repository['namespace_id'], False
                     )
@@ -298,7 +298,7 @@ class SwrEeImage(QueryResourceManager):
         """
         service = 'swr'
         enum_spec = ('list_instance_all_artifacts', 'body', 'offset')
-        id = 'uid'
+        id = 'id'
         name = 'tag'
         filter_name = 'tag'
         filter_type = 'scalar'
@@ -376,7 +376,7 @@ class SwrEeImage(QueryResourceManager):
 
         for artifact in artifacts:
             artifact['instance_id'] = instance['id']
-            artifact['uid'] = f"{instance['id']}/{artifact['id']}"
+            artifact['id'] = f"{instance['id']}/{artifact['id']}"
 
         return artifacts
 
@@ -408,7 +408,7 @@ class SwrEeImage(QueryResourceManager):
             )
             for artifact in artifacts:
                 artifact['instance_id'] = repo['instance_id']
-                artifact['uid'] = f"{repo['instance_id']}/{artifact['id']}"
+                artifact['id'] = f"{repo['instance_id']}/{artifact['id']}"
 
             all_artifacts.extend(artifacts)
             log.debug(
@@ -1433,61 +1433,16 @@ class SignatureRule(SwrEeBaseFilter):
 
     .. code-block:: yaml
 
-       policies:
-        # Filter namespaces with specific signature rules (path matching specific properties)
-        - name: swr-with-specific-rule
-          resource: huaweicloud.swr-ee-namespace
-          filters:
-            - type: lifecycle-rule
-              state: True  # namespace with signature rules
-              match:
-                - type: value
-                  key: rules[0].template
-                  value: latestPushedK   # latestPushedK, latestPulledN,
-                                        # nDaysSinceLastPush, nDaysSinceLastPull
-
-    .. code-block:: yaml
-
-       policies:
-        # Filter signature with retention period greater than 30 days
-        - name: swr-with-long-retention
-          resource: huaweicloud.swr-ee-namespace
-          filters:
-            - type: signature-rule
-              state: True  # signature with lifecycle rules
-              match:
-                - type: value
-                  key: rules[0].params.nDaysSinceLastPull
-                  value_type: integer
-                  op: gte
-                  value: 30
-
-    .. code-block:: yaml
-
-       policies:
-        # Filter repositories using specific tag selector
-        - name: swr-with-specific-tag-selector
-          resource: huaweicloud.swr-ee-namespace
-          filters:
-            - type: lifecycle-rule
-              tag_selector:
-                kind: doublestar
-                pattern: v5
-
-    .. code-block:: yaml
-
-       policies:
-        # Combined filter conditions: match both parameters and tag selector
-        - name: swr-with-combined-filters
-          resource: huaweicloud.swr-ee-namespace
-          filters:
-              tag_selector:
-                kind: doublestar
-                pattern: v5
-              match:
-                - type: value
-                  key: algorithm
-                  value: or
+        policies:
+          - name: swr-ee-signature-alg-filter
+            resource: huaweicloud.swr-ee-namespace
+            filters:
+              - type: signature-rule
+                state: True
+                match:
+                  - type: value
+                    key: signature_algorithm
+                    value: ECDSA_SHA_384
     """
 
     schema = type_schema(
@@ -1585,34 +1540,14 @@ class SetSignature(HuaweiCloudBaseAction):
     .. code-block:: yaml
 
         policies:
-        # 配置镜像签名规则, 根据repository, tag过滤
-          - name: swr-set-signature
+          - name: swr-ee-set-signature-filter
             resource: huaweicloud.swr-ee-namespace
             filters:
               - type: signature-rule
                 state: False
             actions:
               - type: set-signature
-                rules:
-                  - scope_selectors:
-                      repository:
-                        - kind: doublestar
-                          pattern: '{repo1, repo2}'
-                    tag_selectors:
-                      - kind: doublestar
-                        pattern: '^release-.*$'
-
-    .. code-block:: yaml
-
-        policies:
-        # 配置老化规则
-          - name: swr-set-signature
-            resource: huaweicloud.swr-ee-namespace
-            filters:
-              - type: signature-rule
-                state: False
-            actions:
-              - type: set-signature
+                state: True
                 rules:
                   - scope_selectors:
                       repository:
@@ -1621,19 +1556,8 @@ class SetSignature(HuaweiCloudBaseAction):
                     tag_selectors:
                       - kind: doublestar
                         pattern: '**'
-
-    .. code-block:: yaml
-
-        policies:
-        # 取消老化规则
-          - name: swr-unset-signature
-            resource: huaweicloud.swr-ee-namespace
-            filters:
-              - type: signature-rule
-                state: True
-            actions:
-              - type: set-signature
-                state: False
+                signature_key: a8b3757e-6d3b-4799-8d33-6612439f202b
+                signature_algorithm: ECDSA_SHA_384
     """
 
     schema = type_schema(
